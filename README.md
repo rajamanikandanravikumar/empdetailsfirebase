@@ -30,143 +30,144 @@ Step 7: Save and run the application.
 ```
 /*
 Program to print the DatabaseTable using the firebasedatabase”.
-Developed by: RAJAMANIKANDAN R
-Registeration Number : 212223220082
+Developed by: Naveen Kumar V
+Registeration Number : 212223220068
 */
 ```
+## Employee.java
+```
+package com.example.employeeapp;
 
-### CRUD - CREATE,READ,UPDATE,DELETE:
-
-#### ADD COUNTRY:
-````
-package com.example.crud;
-
-import android.os.Bundle;
-import android.view.View;
-import android.widget.EditText;
-import android.widget.Toast;
-
-import androidx.appcompat.app.AppCompatActivity;
-
-public class AddCountryActivity extends AppCompatActivity {
-
-    private EditText etName, etCurrency;
-    private DBManager dbManager;
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_add_country);
-
-        etName = findViewById(R.id.etName);
-        etCurrency = findViewById(R.id.etCurrency);
-        dbManager = new DBManager(this);
-    }
-
-    public void saveCountry(View view) {
-        String name = etName.getText().toString();
-        String currency = etCurrency.getText().toString();
-
-        if (!name.isEmpty() && !currency.isEmpty()) {
-            dbManager.addCountry(name, currency);
-            Toast.makeText(this, "Country added", Toast.LENGTH_SHORT).show();
-            finish();
-        } else {
-            Toast.makeText(this, "Please enter all fields", Toast.LENGTH_SHORT).show();
-        }
-    }
-}
-
-````
-
-### CREDENTIALS FOR ADDITION OF COUNTRY:
-````
-package com.example.crud;
-
-public class Country {
-    private int id;
+public class Employee {
+    private String id;
     private String name;
-    private String currency;
+    private String salary;
+    public Employee() {}
 
-    public Country(int id, String name, String currency) {
+    public Employee(String id, String name, String salary) {
         this.id = id;
         this.name = name;
-        this.currency = currency;
+        this.salary = salary;
     }
 
-    public int getId() { return id; }
+    public String getId() { return id; }
     public String getName() { return name; }
-    public String getCurrency() { return currency; }
+    public String getSalary() { return salary; }
 
     @Override
     public String toString() {
-        return name + " - " + currency;
+        return name + " - ₹" + salary;
     }
 }
+``` 
+## DBManager.java
+```
+package com.example.employeeapp;
 
-````
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 
-#### COUNTRY VIEW LIST:
-````
-package com.example.crud;
+public class DBManager {
+    private DatabaseReference dbRef;
+
+    public DBManager() {
+        dbRef = FirebaseDatabase.getInstance().getReference("employees");
+    }
+    public void insertEmployee(Employee employee) {
+        String key = dbRef.push().getKey();
+        employee = new Employee(key, employee.getName(), employee.getSalary());
+        dbRef.child(key).setValue(employee);
+    }
+    public void updateEmployee(Employee employee) {
+        dbRef.child(employee.getId()).setValue(employee);
+    }
+    public void deleteEmployee(String id) {
+        dbRef.child(id).removeValue();
+    }
+
+    public DatabaseReference getDatabaseRef() {
+        return dbRef;
+    }
+}
+```
+## EmployeeListActivity.java
+```
+package com.example.employeeapp;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.view.View;
-import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
-import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
-import java.util.List;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.ValueEventListener;
 
-public class CountryListActivity extends AppCompatActivity {
+import java.util.ArrayList;
+
+public class EmployeeListActivity extends AppCompatActivity {
 
     private ListView listView;
+    private ArrayAdapter<Employee> adapter;
+    private ArrayList<Employee> employees;
     private DBManager dbManager;
-    private List<Country> countryList;
-    private ArrayAdapter<Country> adapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_country_list);
+        setContentView(R.layout.activity_employee_list);
 
         listView = findViewById(R.id.listView);
-        dbManager = new DBManager(this);
+        dbManager = new DBManager();
+        employees = new ArrayList<>();
 
-        loadCountries();
+        adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, employees);
+        listView.setAdapter(adapter);
 
+        loadEmployees();
         listView.setOnItemClickListener((parent, view, position, id) -> {
-            Country selectedCountry = countryList.get(position);
-            Intent intent = new Intent(CountryListActivity.this, ModifyCountryActivity.class);
-            intent.putExtra("countryId", selectedCountry.getId());
+            Employee selected = employees.get(position);
+            Intent intent = new Intent(EmployeeListActivity.this, ModifyEmployeeActivity.class);
+            intent.putExtra("id", selected.getId());
+            intent.putExtra("name", selected.getName());
+            intent.putExtra("salary", selected.getSalary());
             startActivity(intent);
+        });
+        listView.setOnItemLongClickListener((parent, view, position, id) -> {
+            Employee selected = employees.get(position);
+            dbManager.deleteEmployee(selected.getId());
+            return true;
         });
     }
 
-    private void loadCountries() {
-        countryList = dbManager.getAllCountries();
-        adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, countryList);
-        listView.setAdapter(adapter);
+    private void loadEmployees() {
+        dbManager.getDatabaseRef().addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                employees.clear();
+                for (DataSnapshot ds : snapshot.getChildren()) {
+                    Employee emp = ds.getValue(Employee.class);
+                    if (emp != null) employees.add(emp);
+                }
+                adapter.notifyDataSetChanged();
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {}
+        });
     }
 
-    public void addCountry(View view) {
-        startActivity(new Intent(this, AddCountryActivity.class));
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        loadCountries(); // Refresh list when coming back
+    public void addEmployee(android.view.View view) {
+        startActivity(new Intent(this, AddEmployeeActivity.class));
     }
 }
-````
-#### MODIFY/UPDATE/DELETE OPERATION:
-````
-package com.example.crud;
+```
+## AddEmployeeActivity.java
+```
+package com.example.employeeapp;
 
 import android.os.Bundle;
 import android.view.View;
@@ -175,210 +176,146 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-public class ModifyCountryActivity extends AppCompatActivity {
+public class AddEmployeeActivity extends AppCompatActivity {
 
-    private EditText etName, etCurrency;
+    private EditText etName, etSalary;
     private DBManager dbManager;
-    private int countryId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_modify_country);
+        setContentView(R.layout.activity_add_employee);
 
         etName = findViewById(R.id.etName);
-        etCurrency = findViewById(R.id.etCurrency);
-        dbManager = new DBManager(this);
-
-        countryId = getIntent().getIntExtra("countryId", -1);
-        Country country = dbManager.getAllCountries().stream()
-                .filter(c -> c.getId() == countryId)
-                .findFirst().orElse(null);
-
-        if (country != null) {
-            etName.setText(country.getName());
-            etCurrency.setText(country.getCurrency());
-        }
+        etSalary = findViewById(R.id.etSalary);
+        dbManager = new DBManager();
     }
 
-    public void updateCountry(View view) {
-        String name = etName.getText().toString();
-        String currency = etCurrency.getText().toString();
+    public void saveEmployee(View view) {
+        String name = etName.getText().toString().trim();
+        String salary = etSalary.getText().toString().trim();
 
-        if (!name.isEmpty() && !currency.isEmpty()) {
-            dbManager.updateCountry(countryId, name, currency);
-            Toast.makeText(this, "Country updated", Toast.LENGTH_SHORT).show();
-            finish();
-        } else {
-            Toast.makeText(this, "Please enter all fields", Toast.LENGTH_SHORT).show();
+        if (name.isEmpty() || salary.isEmpty()) {
+            Toast.makeText(this, "Enter all fields", Toast.LENGTH_SHORT).show();
+            return;
         }
-    }
 
-    public void deleteCountry(View view) {
-        dbManager.deleteCountry(countryId);
-        Toast.makeText(this, "Country deleted", Toast.LENGTH_SHORT).show();
+        dbManager.insertEmployee(new Employee(null, name, salary));
+        Toast.makeText(this, "Employee Added", Toast.LENGTH_SHORT).show();
         finish();
     }
 }
-````
-
-#### MAIN FUNCTION:
-````
-package com.example.crud;
+```
+## ModifyEmployeeActivity.java
+```
+package com.example.employeeapp;
 
 import android.os.Bundle;
-
-import com.google.android.material.bottomnavigation.BottomNavigationView;
+import android.view.View;
+import android.widget.EditText;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.navigation.NavController;
-import androidx.navigation.Navigation;
-import androidx.navigation.ui.AppBarConfiguration;
-import androidx.navigation.ui.NavigationUI;
 
-import com.example.crud.databinding.ActivityMainBinding;
+public class ModifyEmployeeActivity extends AppCompatActivity {
 
-public class MainActivity extends AppCompatActivity {
-
-    private ActivityMainBinding binding;
+    private EditText etName, etSalary;
+    private DBManager dbManager;
+    private String employeeId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_modify_employee);
 
-        binding = ActivityMainBinding.inflate(getLayoutInflater());
-        setContentView(binding.getRoot());
+        etName = findViewById(R.id.etName);
+        etSalary = findViewById(R.id.etSalary);
+        dbManager = new DBManager();
 
-        BottomNavigationView navView = findViewById(R.id.nav_view);
-        // Passing each menu ID as a set of Ids because each
-        // menu should be considered as top level destinations.
-        AppBarConfiguration appBarConfiguration = new AppBarConfiguration.Builder(
-                R.id.navigation_home, R.id.navigation_dashboard, R.id.navigation_notifications)
-                .build();
-        NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_activity_main);
-        NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration);
-        NavigationUI.setupWithNavController(binding.navView, navController);
+        employeeId = getIntent().getStringExtra("id");
+        etName.setText(getIntent().getStringExtra("name"));
+        etSalary.setText(getIntent().getStringExtra("salary"));
     }
 
-}
-````
+    public void updateEmployee(View view) {
+        String name = etName.getText().toString().trim();
+        String salary = etSalary.getText().toString().trim();
 
-#### DATABASE MANAGER:
-````
-package com.example.crud;
-
-import android.content.ContentValues;
-import android.content.Context;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
-
-import java.util.ArrayList;
-import java.util.List;
-
-public class DBManager {
-
-    private DatabaseHelper dbHelper;
-    private SQLiteDatabase database;
-
-    public DBManager(Context context) {
-        dbHelper = new DatabaseHelper(context);
-        database = dbHelper.getWritableDatabase();
-    }
-
-    // Insert new country
-    public long addCountry(String name, String currency) {
-        ContentValues values = new ContentValues();
-        values.put(DatabaseHelper.COLUMN_NAME, name);
-        values.put(DatabaseHelper.COLUMN_CURRENCY, currency);
-        return database.insert(DatabaseHelper.TABLE_COUNTRIES, null, values);
-    }
-
-    // Get all countries
-    public List<Country> getAllCountries() {
-        List<Country> countryList = new ArrayList<>();
-        Cursor cursor = database.query(DatabaseHelper.TABLE_COUNTRIES, null, null, null, null, null, null);
-        if (cursor.moveToFirst()) {
-            do {
-                int id = cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseHelper.COLUMN_ID));
-                String name = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COLUMN_NAME));
-                String currency = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COLUMN_CURRENCY));
-                countryList.add(new Country(id, name, currency));
-            } while (cursor.moveToNext());
+        if (name.isEmpty() || salary.isEmpty()) {
+            Toast.makeText(this, "Enter all fields", Toast.LENGTH_SHORT).show();
+            return;
         }
-        cursor.close();
-        return countryList;
+
+        dbManager.updateEmployee(new Employee(employeeId, name, salary));
+        Toast.makeText(this, "Employee Updated", Toast.LENGTH_SHORT).show();
+        finish();
     }
 
-    // Update a country
-    public int updateCountry(int id, String name, String currency) {
-        ContentValues values = new ContentValues();
-        values.put(DatabaseHelper.COLUMN_NAME, name);
-        values.put(DatabaseHelper.COLUMN_CURRENCY, currency);
-        return database.update(DatabaseHelper.TABLE_COUNTRIES, values, DatabaseHelper.COLUMN_ID + "=?", new String[]{String.valueOf(id)});
-    }
-
-    // Delete a country
-    public int deleteCountry(int id) {
-        return database.delete(DatabaseHelper.TABLE_COUNTRIES, DatabaseHelper.COLUMN_ID + "=?", new String[]{String.valueOf(id)});
+    public void deleteEmployee(View view) {
+        dbManager.deleteEmployee(employeeId);
+        Toast.makeText(this, "Employee Deleted", Toast.LENGTH_SHORT).show();
+        finish();
     }
 }
-````
-#### DB-HELPER:
-````
-package com.example.crud;
+```
+## activity_employee_list.xml
+```
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
 
-import android.content.Context;
-import android.database.sqlite.SQLiteDatabase;
-import android.database.sqlite.SQLiteOpenHelper;
+    <Button
+        android:text="Add Employee"
+        android:onClick="addEmployee"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
 
-public class DatabaseHelper extends SQLiteOpenHelper {
+    <ListView
+        android:id="@+id/listView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"/>
+</LinearLayout>
+```
+## activity_add_employee.xml
+```
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
 
-    private static final String DATABASE_NAME = "CountryDB";
-    private static final int DATABASE_VERSION = 1;
+    <EditText
+        android:id="@+id/etName"
+        android:hint="Employee Name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
 
-    public static final String TABLE_COUNTRIES = "countries";
-    public static final String COLUMN_ID = "id";
-    public static final String COLUMN_NAME = "name";
-    public static final String COLUMN_CURRENCY = "currency";
+    <EditText
+        android:id="@+id/etSalary"
+        android:hint="Salary"
+        android:inputType="number"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
 
-    private static final String TABLE_CREATE =
-            "CREATE TABLE " + TABLE_COUNTRIES + " (" +
-                    COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                    COLUMN_NAME + " TEXT, " +
-                    COLUMN_CURRENCY + " TEXT);";
-
-    public DatabaseHelper(Context context) {
-        super(context, DATABASE_NAME, null, DATABASE_VERSION);
-    }
-
-    @Override
-    public void onCreate(SQLiteDatabase db) {
-        db.execSQL(TABLE_CREATE);
-    }
-
-    @Override
-    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_COUNTRIES);
-        onCreate(db);
-    }
-}
-
-````
+    <Button
+        android:text="Save"
+        android:onClick="saveEmployee"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+</LinearLayout>
+```
 ## OUTPUT
+## List Employee
+<img width="342" height="648" alt="Screenshot 2025-09-08 104943" src="https://github.com/user-attachments/assets/f8230b9c-7ac9-4ad1-b88f-fa6d8da07ac7" />
 
-#### ADDITION/CREATION:
-
-<img width="343" height="183" alt="Screenshot 2025-09-02 101719" src="https://github.com/user-attachments/assets/3dd05ebc-914d-4768-a64c-7b3a3c2fbbbc" />
-
-#### DATABASE VIEW / COUNTRY LIST VIEW:
-
-<img width="348" height="349" alt="Screenshot 2025-09-02 101748" src="https://github.com/user-attachments/assets/25edb168-0fda-455b-ab0e-b7ff36b5c29e" />
-
-#### MODIFICATION(UPDATE/DELETE):
-<img width="338" height="188" alt="Screenshot 2025-09-02 101758" src="https://github.com/user-attachments/assets/9363706a-6d1f-45d6-88a9-4c3d65a8392e" />
+## Update & Delete Employee
+![WhatsApp Image 2025-09-09 at 10 22 36_feb8a95a](https://github.com/user-attachments/assets/37d31e82-0dd5-499f-9293-04453df2088e)
 
 
-
+## Add Employee
+<img width="333" height="648" alt="Screenshot 2025-09-08 102745" src="https://github.com/user-attachments/assets/19e3e548-03bb-427c-9cd3-f1d4054da71a" />
 
 ## RESULT
 Thus a Simple Android Application create a firebase database and to display the employee details using Firbase Real Time Database in Android Studio is developed and executed successfully.
